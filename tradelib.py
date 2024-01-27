@@ -9,6 +9,7 @@ class Trader():
     def __init__(self, ticker):
         self.ticker = ticker
         self.trend = "NA"
+        self.buy_sell = None
         self.entryPrice = 0.0
         self.takeProfit = 0.0
         self.stopLoss = 0.0
@@ -16,9 +17,9 @@ class Trader():
 
         lg.info('Trade is initialized with ticker %s ...!!' % (self.ticker))
 
-        file = self.ticker + ".txt"
+        self.file = self.ticker + ".txt"
         try:
-            with open(file) as f:
+            with open(self.file) as f:
                 data = f.readlines()
                 self.trend = data[0].strip('\n')
         except FileNotFoundError:
@@ -31,9 +32,13 @@ class Trader():
     def init_trade(self):
         stock_data = hist_data(self.ticker, "MCX")
         high_price = max(stock_data.iloc[-2]['high'], stock_data.iloc[-3]['high'])
+        # self.high_price = 199 # For Test
         self.high_price = high_price
+        print('high_price: ', self.high_price)
         low_price = min(stock_data.iloc[-2]['low'], stock_data.iloc[-3]['low'])
+        # self.low_price = 101 # For Test
         self.low_price = low_price
+        print('low_price: ', self.low_price)
 
         while True:
             lg.info('Running trade for %s ... !' % (self.ticker))
@@ -42,6 +47,7 @@ class Trader():
 
             if(cur_time < gvarlist.startTime or cur_time > gvarlist.endTime):
                 lg.info('Market is closed. \n')
+                logout()
                 sys.exit()
                 # break
 
@@ -51,10 +57,12 @@ class Trader():
             if (cur_price > self.high_price):
                 lg.info('LONG trend confirmed for %s \n' % self.ticker)
                 self.trend = 'LONG'
+                self.buy_sell = 'BUY'
                 break
             elif (cur_price < self.low_price):
                 lg.info('SHORT trend confirmed for %s \n' % self.ticker)
                 self.trend = 'SHORT'
+                self.buy_sell = 'SELL'
                 break
             else:
                 lg.info('Trend is NOT confirmed for %s !!!\n' % (self.ticker))
@@ -64,13 +72,34 @@ class Trader():
 
         # decide the total amount to invest
         self.sharesQty = get_shares_amount(cur_price)
-        success = submit_order(self.ticker, self.sharesQty, "LONG")
+        orderID = submit_order(self.ticker, self.sharesQty, self.buy_sell)
+
+        success = False
+        count = 0
+        while (get_oder_status(orderID) == 'open'):
+            lg.info('%s: order in open for %s, waiting ... %d ' % (self.buy_sell, self.ticker, count))
+        
+        status = get_oder_status(orderID)
+        lg.info('%s Order status for %s : %s ' % (self.buy_sell, self.ticker, status))
+        if(status == 'completed'):
+            success = True
 
         if(success):
-            print("Add the position to list")
+            with open(self.file, "w") as f:
+                f.write(self.trend)
+                f.write("\n")
+                f.write(str(self.sharesQty))
+                f.write("\n")
+                f.write(str(self.takeProfit))
+                f.write("\n")
+                f.write(str(self.stopLoss))
+                f.write("\n")
+                f.flush()
+                f.close()
         else:
-            print("Exit the trade")
-
+            print("Order Not success, Exit the trade")
+            logout()
+            sys.exit()
 
     def run(self):
         while True:
@@ -80,6 +109,7 @@ class Trader():
             cur_time = dt.datetime.now(pytz.timezone("Asia/Kolkata")).time()
             if(cur_time < gvarlist.startTime or cur_time > gvarlist.endTime):
                 lg.info('Market is closed. ')
+                logout()
                 sys.exit()
 
             cur_price = get_current_price(self.ticker)

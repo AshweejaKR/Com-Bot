@@ -37,7 +37,11 @@ def main():
 
     ticker = "GOLDPETAL24FEBFUT"
     obj = Trader(ticker)
-    obj.run()
+    # obj.run()
+
+    # orderID = submit_order(ticker, 1, 'BUY')
+    # status = get_oder_status(orderID)
+    # print('Order Status: ', status)
 
     logout()
 

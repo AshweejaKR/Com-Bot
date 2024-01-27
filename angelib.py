@@ -26,7 +26,8 @@ def login():
         template = "An exception of type {0} occurred. error message:{1!r}"
         message = template.format(type(err).__name__, err.args)
         lg.error(message)
-        sys.exit(0)
+        logout()
+        sys.exit()
 
 def logout():
     try:
@@ -45,7 +46,7 @@ def logout():
 def token_lookup(ticker, exchange = "MCX"):
     try:
         for instrument in gvarlist.instrument_list:
-            if instrument["symbol"] == ticker and instrument["exch_seg"] == exchange and instrument["instrumenttype"] == "FUTCOM":
+            if instrument["symbol"] == ticker and instrument["exch_seg"] == exchange:
                 return instrument["token"]
     except Exception as err:
         template = "An exception of type {0} occurred. error message:{1!r}"
@@ -57,19 +58,48 @@ def symbol_lookup(token, exchange = "MCX"):
         if instrument["token"] == token and instrument["exch_seg"] == exchange:
             return instrument["symbol"][:-3]
 
-def submit_order(ticker, sharesQty, trend, exchange = 'MCX'):
-    lg.info('Submitting %s Order for %s' % (trend, ticker))
+def submit_order(ticker, sharesQty, buy_sell, exchange = 'MCX'):
+    lg.info('Submitting %s Order for %s, Qty = %d ' % (buy_sell, ticker, sharesQty))
     orderID = None
+
+    try:
+        price = get_current_price(ticker)
+        params = {
+                    "variety" : "NORMAL",
+                    "tradingsymbol" : "{}".format(ticker),
+                    "symboltoken" : token_lookup(ticker),
+                    "transactiontype" : buy_sell,
+                    "exchange" : exchange,
+                    "ordertype" : "MARKET",
+                    "producttype" : "CARRYFORWARD",
+                    "duration" : "DAY",
+                    "quantity" : sharesQty
+                    }
+        
+        lg.info('params: %s ' % params)
+        orderID = gvarlist.api.placeOrder(params)
+        lg.info('orderID: %s ' % orderID)
+    except Exception as err:
+        template = "An exception of type {0} occurred. error message:{1!r}"
+        message = template.format(type(err).__name__, err.args)
+        lg.error(message)
+        lg.error('%s order NOT submitted!' % buy_sell)
+        logout()
+        sys.exit()
     return orderID
     
 def get_oder_status(orderID):
     status = 'NA'
+    # For Test
+    # return 'completed'
+    # End test
     
     time.sleep(2)
     order_history_response = gvarlist.api.orderBook()  
     try:
         for i in order_history_response['data']:
             if(i['orderid'] == orderID):
+                print(i)
                 status = i['status'] # completed/rejected/open/cancelled
                 break
     except Exception as err:
