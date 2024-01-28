@@ -63,7 +63,6 @@ def submit_order(ticker, sharesQty, buy_sell, exchange = 'MCX'):
     orderID = None
 
     try:
-        price = get_current_price(ticker)
         params = {
                     "variety" : "NORMAL",
                     "tradingsymbol" : "{}".format(ticker),
@@ -99,7 +98,7 @@ def get_oder_status(orderID):
     try:
         for i in order_history_response['data']:
             if(i['orderid'] == orderID):
-                print(i)
+                lg.debug(str(i))
                 status = i['status'] # completed/rejected/open/cancelled
                 break
     except Exception as err:

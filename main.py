@@ -37,13 +37,14 @@ def main():
 
     ticker = "GOLDPETAL24FEBFUT"
     obj = Trader(ticker)
-    # obj.run()
-
-    # orderID = submit_order(ticker, 1, 'BUY')
-    # status = get_oder_status(orderID)
-    # print('Order Status: ', status)
+    success = obj.run()
 
     logout()
+
+    if not success:
+        lg.info('Trading was not successful, locking asset')
+    else:
+        lg.info('Trading was successful!')
 
     lg.info('Trading Bot finished ... ')
 

@@ -6,5 +6,5 @@ api = None
 takeProfitMargin = 0.02
 stopLossMargin = 0.01
 startTime = dt.time(9, 15)
-endTime = dt.time(23, 15)
+endTime = dt.time(22, 50)
 

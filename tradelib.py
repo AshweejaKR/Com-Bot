@@ -22,6 +22,14 @@ class Trader():
             with open(self.file) as f:
                 data = f.readlines()
                 self.trend = data[0].strip('\n')
+                self.sharesQty = int(data[1])
+                self.takeProfit = float(data[2])
+                self.stopLoss = float(data[3])
+
+                lg.debug('trend for %s : %s' % (self.ticker, self.trend))
+                lg.debug('sharesQty for %s : %s' % (self.ticker, self.sharesQty))
+                lg.debug('takeProfit for %s : %s' % (self.ticker, self.takeProfit))
+                lg.debug('stopLoss for %s : %s' % (self.ticker, self.stopLoss))
         except FileNotFoundError:
             self.init_trade()
         except Exception as err:
@@ -34,11 +42,11 @@ class Trader():
         high_price = max(stock_data.iloc[-2]['high'], stock_data.iloc[-3]['high'])
         # self.high_price = 199 # For Test
         self.high_price = high_price
-        print('high_price: ', self.high_price)
+        lg.debug('high_price for %s = %f ' % (self.ticker, self.high_price))
         low_price = min(stock_data.iloc[-2]['low'], stock_data.iloc[-3]['low'])
         # self.low_price = 101 # For Test
         self.low_price = low_price
-        print('low_price: ', self.low_price)
+        lg.debug('low_price for %s = %f ' % (self.ticker, self.low_price))
 
         while True:
             lg.info('Running trade for %s ... !' % (self.ticker))
@@ -78,6 +86,7 @@ class Trader():
         count = 0
         while (get_oder_status(orderID) == 'open'):
             lg.info('%s: order in open for %s, waiting ... %d ' % (self.buy_sell, self.ticker, count))
+            count = count + 1
         
         status = get_oder_status(orderID)
         lg.info('%s Order status for %s : %s ' % (self.buy_sell, self.ticker, status))
@@ -97,7 +106,7 @@ class Trader():
                 f.flush()
                 f.close()
         else:
-            print("Order Not success, Exit the trade")
+            lg.error('%s Order Not success for %s, Exit the trade, (status = %s)' % (self.buy_sell, self.ticker, status))
             logout()
             sys.exit()
 
@@ -114,6 +123,54 @@ class Trader():
 
             cur_price = get_current_price(self.ticker)
             lg.info('Current price for %s is %f ' % (self.ticker, cur_price))
+
+            if(self.trend == 'LONG'):
+                if(self.takeProfit < cur_price):
+                    self.trail_SL(cur_price)
+
+                if(self.stopLoss > cur_price):
+                    self.trend = 'NA'
+                    self.buy_sell = 'SELL'
+                    break
+
+            elif(self.trend == 'SHORT'):
+                if(self.takeProfit > cur_price):
+                    self.trail_SL(cur_price)
+
+                if(self.stopLoss < cur_price):
+                    self.trend = 'NA'
+                    self.buy_sell = 'BUY'
+                    break
+            
+            else:
+                lg.error("Trend is Not Valid")
+                raise ValueError
+
+            lg.debug('trend for %s : %s' % (self.ticker, self.trend))
+            lg.debug('sharesQty for %s : %s' % (self.ticker, self.sharesQty))
+            lg.debug('takeProfit for %s : %s' % (self.ticker, self.takeProfit))
+            lg.debug('stopLoss for %s : %s' % (self.ticker, self.stopLoss))
+
+        orderID = submit_order(self.ticker, self.sharesQty, self.buy_sell)
+
+        success = False
+        count = 0
+
+        while (get_oder_status(orderID) == 'open'):
+            lg.info('%s: order in open for %s, waiting ... %d ' % (self.buy_sell, self.ticker, count))
+            count = count + 1
+            
+        status = get_oder_status(orderID)  
+        lg.info('%s Order status for %s : %s ' % (self.buy_sell, self.ticker, status))
+        if(status == 'completed'):
+            success = True
+
+        if os.path.isfile(self.file):
+            os.remove(self.file)
+        else:
+            lg.error("Error: %s file not found" % self.file)
+            success = False
+        return success
 
     def set_takeprofit(self, entryPrice):
         if self.trend == 'LONG':
@@ -137,6 +194,16 @@ class Trader():
             lg.error("Trend is Not Valid")
             raise ValueError
         
-    def trail_SL(self):
-        pass
+    def trail_SL(self, cur_price):
+        if(self.trend == 'LONG'):
+            temp = self.takeProfit - self.stopLoss
+            self.takeProfit = self.takeProfit + temp / 1.5
+            self.stopLoss = self.stopLoss + temp / 1.5
+        elif(self.trend == 'SHORT'):
+            temp = self.stopLoss - self.takeProfit
+            self.takeProfit = self.takeProfit - temp / 1.5
+            self.stopLoss = self.stopLoss - temp / 1.5
+        else:
+            lg.error("Trend is Not Valid")
+            raise ValueError
     
